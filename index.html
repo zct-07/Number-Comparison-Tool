@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>电话号码比对工具</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 1300px;
+    }
+    h1 { font-size: 22px; font-weight: 600; color: #1a1a1a; margin-bottom: 6px; }
+    .subtitle { font-size: 14px; color: #888; margin-bottom: 28px; }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+    .col-label { font-size: 13px; font-weight: 500; color: #555; margin-bottom: 8px; }
+
+    /* 普通 textarea，撤销完全正常 */
+    textarea {
+      width: 100%;
+      min-height: 500px;
+      max-height: 650px;
+      overflow-y: auto;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fafafa;
+      padding: 10px 14px;
+      font-family: "Courier New", monospace;
+      font-size: 15px;
+      line-height: 1.9;
+      resize: vertical;
+      outline: none;
+      color: #1a1a1a;
+    }
+    textarea:focus { border-color: #6c63ff; background: #fff; }
+
+    /* 比对结果展示框（只读） */
+    .result-box {
+      width: 100%;
+      min-height: 0;
+      max-height: 650px;
+      overflow-y: auto;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 10px;
+      background: #fafafa;
+      padding: 10px 14px;
+      font-family: "Courier New", monospace;
+      font-size: 15px;
+      line-height: 1.9;
+      white-space: pre-wrap;
+      word-break: break-all;
+      display: none;
+    }
+
+    .num-line      { display: block; min-height: 1.9em; }
+    .ch-same       { color: #1a1a1a; }
+    .ch-diff       { background: #fff3e0; color: #e65100; border-radius: 2px; font-weight: 700; }
+    .ch-extra      { background: #fce4ec; color: #c62828; border-radius: 2px; font-weight: 700; }
+    .line-unmatched{ color: #c62828; background: #fff5f5; border-radius: 4px; padding: 0 4px; display: block; min-height: 1.9em; }
+    .line-empty    { display: block; min-height: 1.9em; color: #ddd; }
+
+    .btn {
+      padding: 11px 36px;
+      background: #6c63ff; color: #fff;
+      font-size: 15px; font-weight: 500;
+      border: none; border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-right: 10px;
+    }
+    .btn:hover { background: #574fd6; }
+    .btn:active { transform: scale(0.98); }
+    .btn-reset {
+      padding: 11px 24px;
+      background: #fff; color: #888;
+      font-size: 15px;
+      border: 1.5px solid #e0e0e0; border-radius: 10px;
+      cursor: pointer;
+    }
+    .btn-reset:hover { background: #f5f5f5; }
+    .btns { margin-bottom: 12px; }
+
+    .stats { font-size: 13px; color: #888; margin-top: 6px; min-height: 20px; }
+    .stats b { color: #e65100; }
+
+    .legend {
+      display: flex; gap: 20px; flex-wrap: wrap;
+      margin-top: 20px; padding-top: 16px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #888; }
+    .swatch {
+      min-width: 36px; height: 20px; border-radius: 3px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: "Courier New", monospace; font-size: 12px; font-weight: 700; padding: 0 4px;
+    }
+    .sw-diff  { background: #fff3e0; color: #e65100; }
+    .sw-extra { background: #fce4ec; color: #c62828; }
+    .sw-unmat { background: #fff5f5; color: #c62828; border: 1px dashed #f48fb1; }
+    .sw-same  { background: #fafafa; border: 1px solid #ececec; color: #1a1a1a; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>📞 电话号码比对工具</h1>
+  <p class="subtitle">在下方输入号码，点击「开始比对」后自动智能匹配，差异及多余号码高亮显示</p>
+
+  <div class="input-row" id="inputRow">
+    <div>
+      <div class="col-label">左侧号码（每行一个）</div>
+      <textarea id="leftInput" placeholder="粘贴号码，每行一个"></textarea>
+      <div class="result-box" id="leftResult"></div>
+    </div>
+    <div>
+      <div class="col-label">右侧号码（每行一个）</div>
+      <textarea id="rightInput" placeholder="粘贴号码，每行一个"></textarea>
+      <div class="result-box" id="rightResult"></div>
+    </div>
+  </div>
+
+  <div class="btns">
+    <button class="btn" onclick="compare()">开始比对</button>
+    <button class="btn-reset" onclick="resetAll()">重置 / 重新编辑</button>
+  </div>
+  <div class="stats" id="stats"></div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="swatch sw-diff">5</div> 位置相同但数字不同</div>
+    <div class="legend-item"><div class="swatch sw-extra">+</div> 长度多出的位</div>
+    <div class="legend-item"><div class="swatch sw-unmat">号码</div> 无匹配的多余号码</div>
+    <div class="legend-item"><div class="swatch sw-same">0</div> 完全一致</div>
+  </div>
+</div>
+
+<script>
+  // 从 textarea 读取号码，去重、去空
+  function getLines(id) {
+    return [...new Set(
+      document.getElementById(id).value
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+    )];
+  }
+
+  function lcsAlign(lefts, rights) {
+    const m = lefts.length, n = rights.length;
+    const dp = Array.from({length: m+1}, () => new Array(n+1).fill(0));
+    for (let i = 1; i <= m; i++)
+      for (let j = 1; j <= n; j++)
+        dp[i][j] = lefts[i-1] === rights[j-1]
+          ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+    const pairs = [];
+    let i = m, j = n;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && lefts[i-1] === rights[j-1]) {
+        pairs.push([lefts[i-1], rights[j-1]]); i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) {
+        pairs.push([null, rights[j-1]]); j--;
+      } else {
+        pairs.push([lefts[i-1], null]); i--;
+      }
+    }
+    return pairs.reverse();
+  }
+
+  function diffChars(l, r) {
+    const maxLen = Math.max(l.length, r.length);
+    let lh = '', rh = '';
+    for (let k = 0; k < maxLen; k++) {
+      const lc = l[k], rc = r[k];
+      if (lc === undefined) {
+        rh += `<span class="ch-extra">${rc}</span>`;
+      } else if (rc === undefined) {
+        lh += `<span class="ch-extra">${lc}</span>`;
+      } else if (lc !== rc) {
+        lh += `<span class="ch-diff">${lc}</span>`;
+        rh += `<span class="ch-diff">${rc}</span>`;
+      } else {
+        lh += `<span class="ch-same">${lc}</span>`;
+        rh += `<span class="ch-same">${rc}</span>`;
+      }
+    }
+    return [lh, rh];
+  }
+
+  function compare() {
+    const lefts  = getLines('leftInput');
+    const rights = getLines('rightInput');
+
+    if (!lefts.length && !rights.length) {
+      document.getElementById('stats').innerHTML = '请先输入号码';
+      return;
+    }
+
+    const pairs = lcsAlign(lefts, rights);
+    let leftHtml = '', rightHtml = '';
+    let diffCount = 0, unmatchedL = 0, unmatchedR = 0;
+
+    for (const [l, r] of pairs) {
+      if (l === null) {
+        leftHtml  += `<span class="line-empty">—</span>`;
+        rightHtml += `<span class="line-unmatched">${r}</span>`;
+        unmatchedR++;
+      } else if (r === null) {
+        leftHtml  += `<span class="line-unmatched">${l}</span>`;
+        rightHtml += `<span class="line-empty">—</span>`;
+        unmatchedL++;
+      } else {
+        const [lh, rh] = diffChars(l, r);
+        if (l !== r) diffCount++;
+        leftHtml  += `<span class="num-line">${lh}</span>`;
+        rightHtml += `<span class="num-line">${rh}</span>`;
+      }
+    }
+
+    // 隐藏 textarea，显示结果框
+    document.getElementById('leftInput').style.display  = 'none';
+    document.getElementById('rightInput').style.display = 'none';
+    const lr = document.getElementById('leftResult');
+    const rr = document.getElementById('rightResult');
+    lr.innerHTML  = leftHtml;
+    rr.innerHTML  = rightHtml;
+    lr.style.display = 'block';
+    rr.style.display = 'block';
+
+    const matched = pairs.filter(([l,r]) => l && r).length;
+    const parts = [`共匹配 ${matched} 对`];
+    if (diffCount)  parts.push(`<b>${diffCount} 对有差异</b>`);
+    if (unmatchedL) parts.push(`<b style="color:#c62828">左侧多余 ${unmatchedL} 个</b>`);
+    if (unmatchedR) parts.push(`<b style="color:#c62828">右侧多余 ${unmatchedR} 个</b>`);
+    if (!diffCount && !unmatchedL && !unmatchedR) parts.push('✓ 全部一致');
+    document.getElementById('stats').innerHTML = parts.join(' &nbsp;|&nbsp; ');
+  }
+
+  function resetAll() {
+    // 恢复 textarea，隐藏结果框
+    document.getElementById('leftInput').style.display  = '';
+    document.getElementById('rightInput').style.display = '';
+    document.getElementById('leftResult').style.display  = 'none';
+    document.getElementById('rightResult').style.display = 'none';
+    document.getElementById('leftResult').innerHTML  = '';
+    document.getElementById('rightResult').innerHTML = '';
+    document.getElementById('stats').innerHTML = '';
+  }
+</script>
+</body>
+</html>
